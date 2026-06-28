@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Журнал действий — КТЗ{% endblock %}
+{% block page_title %}Журнал действий{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Журнал действий</h1>
+    <p class="text-muted">Полная история событий в системе</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Дата и время</th><th>Пользователь</th><th>Действие</th><th>Детали</th><th>IP-адрес</th></tr>
+      </thead>
+      <tbody>
+        {% for log in logs.items %}
+        <tr>
+          <td class="mono" style="font-size:12px;white-space:nowrap">{{ log.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+          <td>
+            {% if log.user %}
+            <div class="fw-600" style="font-size:13px">{{ log.user.full_name }}</div>
+            <div class="text-muted" style="font-size:11px">{{ log.user.username }}</div>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td>
+            <span class="badge
+              {% if 'login' in log.action and 'failed' not in log.action %}badge-success
+              {% elif 'failed' in log.action or 'delete' in log.action %}badge-danger
+              {% elif 'create' in log.action %}badge-info
+              {% else %}badge-neutral{% endif %}">
+              {{ log.action }}
+            </span>
+          </td>
+          <td style="font-size:13px;max-width:300px">{{ log.details or '—' }}</td>
+          <td class="mono text-muted" style="font-size:12px">{{ log.ip_address or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Пагинация -->
+  {% if logs.pages > 1 %}
+  <div style="padding:16px 24px;border-top:1px solid #f0f3f8;display:flex;gap:8px;justify-content:center">
+    {% if logs.has_prev %}
+    <a href="{{ url_for('admin.audit_logs', page=logs.prev_num) }}" class="btn btn-secondary btn-sm">← Назад</a>
+    {% endif %}
+    <span class="btn btn-ghost btn-sm">{{ logs.page }} / {{ logs.pages }}</span>
+    {% if logs.has_next %}
+    <a href="{{ url_for('admin.audit_logs', page=logs.next_num) }}" class="btn btn-secondary btn-sm">Вперёд →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

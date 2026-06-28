@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{% if test %}Редактировать{% else %}Создать{% endif %} тест — КТЗ{% endblock %}
+{% block page_title %}{% if test %}Редактировать тест{% else %}Новый тест{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width:700px">
+  <div class="page-header">
+    <div>
+      <h1>{% if test %}Настройки теста{% else %}Новый тест{% endif %}</h1>
+      <p class="text-muted">{% if test %}{{ test.title }}{% else %}Заполните параметры и добавьте вопросы{% endif %}</p>
+    </div>
+    <a href="{{ url_for('tests.list_tests') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> К списку</a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">Название теста *</label>
+          <input type="text" name="title" class="form-control" required
+                 value="{{ test.title if test else '' }}"
+                 placeholder="Например: Охрана труда — базовый уровень">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Описание</label>
+          <textarea name="description" class="form-control" rows="3"
+                    placeholder="Краткое описание цели теста">{{ test.description if test else '' }}</textarea>
+        </div>
+
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label class="form-label">Категория</label>
+            <select name="category_id" class="form-control">
+              <option value="">— Без категории —</option>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}" {% if test and test.category_id == cat.id %}selected{% endif %}>
+                {{ cat.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Время (минут, 0 = без лимита)</label>
+            <input type="number" name="time_limit" class="form-control" min="0" max="480"
+                   value="{{ test.time_limit if test else 30 }}">
+          </div>
+        </div>
+
+        <div class="form-row cols-3">
+          <div class="form-group">
+            <label class="form-label">Проходной балл (%)</label>
+            <input type="number" name="passing_score" class="form-control" min="1" max="100"
+                   value="{{ test.passing_score if test else 70 }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Макс. попыток (0 = ∞)</label>
+            <input type="number" name="max_attempts" class="form-control" min="0" max="99"
+                   value="{{ test.max_attempts if test else 3 }}">
+          </div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:20px">
+          <label class="form-check">
+            <input type="checkbox" name="shuffle_questions" {% if test and test.shuffle_questions %}checked{% endif %}>
+            <span>Перемешивать вопросы</span>
+          </label>
+          <label class="form-check">
+            <input type="checkbox" name="shuffle_options" {% if test and test.shuffle_options %}checked{% endif %}>
+            <span>Перемешивать варианты</span>
+          </label>
+          <label class="form-check">
+            <input type="checkbox" name="show_results" {% if not test or test.show_results %}checked{% endif %}>
+            <span>Показывать разбор после</span>
+          </label>
+          {% if test %}
+          <label class="form-check">
+            <input type="checkbox" name="is_active" {% if test.is_active %}checked{% endif %}>
+            <span>Тест активен</span>
+          </label>
+          {% endif %}
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save"></i> {% if test %}Сохранить{% else %}Создать и добавить вопросы{% endif %}
+          </button>
+          <a href="{{ url_for('tests.list_tests') }}" class="btn btn-secondary">Отмена</a>
+          {% if test %}
+          <a href="{{ url_for('tests.edit_questions', test_id=test.id) }}" class="btn btn-secondary">
+            <i class="fas fa-list"></i> К вопросам
+          </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

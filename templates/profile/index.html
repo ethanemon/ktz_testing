@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Мой профиль — КТЗ{% endblock %}
+{% block page_title %}Личный кабинет{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:start" class="profile-grid">
+
+  <!-- Карточка профиля -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card">
+      <div class="card-body" style="text-align:center;padding:28px 20px">
+        <div class="user-avatar" style="width:72px;height:72px;font-size:28px;margin:0 auto 14px;background:var(--blue)">
+          {{ current_user.full_name[0] if current_user.full_name else 'U' }}
+        </div>
+        <div style="font-size:17px;font-weight:700;margin-bottom:4px">{{ current_user.full_name }}</div>
+        <div class="text-muted" style="font-size:13px;margin-bottom:8px">{{ current_user.position or '—' }}</div>
+        <span class="user-role {{ current_user.role_badge_class }}" style="font-size:12px">{{ current_user.role_display }}</span>
+
+        <div style="margin-top:20px;text-align:left;font-size:13px;line-height:2.2;border-top:1px solid #f0f3f8;padding-top:16px">
+          <div><i class="fas fa-building" style="width:20px;color:var(--muted)"></i> {{ current_user.department or '—' }}</div>
+          <div><i class="fas fa-envelope" style="width:20px;color:var(--muted)"></i> {{ current_user.email }}</div>
+          <div><i class="fas fa-calendar" style="width:20px;color:var(--muted)"></i>
+            Рег. {{ current_user.created_at.strftime('%d.%m.%Y') if current_user.created_at }}
+          </div>
+          {% if current_user.last_login %}
+          <div><i class="fas fa-clock" style="width:20px;color:var(--muted)"></i>
+            Вход {{ current_user.last_login.strftime('%d.%m.%Y %H:%M') }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Статистика -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Моя статистика</span></div>
+      <div class="card-body" style="padding:16px">
+        {% set total = attempts|length %}
+        {% set pass_rate = (passed_count / total * 100)|round(1) if total else 0 %}
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px">
+              <span class="text-muted">Всего тестов</span>
+              <span class="fw-700 mono">{{ total }}</span>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px">
+              <span class="text-muted">Сдано успешно</span>
+              <span class="fw-700 mono" style="color:var(--success)">{{ passed_count }}</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:{{ pass_rate }}%;background:var(--success)"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px">
+              <span class="text-muted">Средний балл</span>
+              <span class="fw-700 mono" style="color:{% if avg_score >= 70 %}var(--success){% else %}var(--danger){% endif %}">{{ avg_score }}%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:{{ avg_score }}%;background:{% if avg_score >= 70 %}var(--success){% else %}var(--danger){% endif %}"></div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px">
+            <span class="text-muted">Сдаваемость</span>
+            <span class="fw-700 mono">{{ pass_rate }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- История тестов -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">История тестирования</span>
+        <span class="badge badge-info">{{ attempts|length }} записей</span>
+      </div>
+      {% if attempts %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Тест</th><th>Категория</th><th>Дата</th><th>Баллы</th><th>Результат</th><th>Время</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for att in attempts %}
+            <tr>
+              <td>
+                <div class="fw-600" style="font-size:13.5px">{{ att.test.title }}</div>
+                <div class="text-muted" style="font-size:11.5px">Попытка #{{ att.attempt_number }}</div>
+              </td>
+              <td>
+                {% if att.test.category %}
+                <span class="badge" style="background:{{ att.test.category.color }}20;color:{{ att.test.category.color }};font-size:10px">{{ att.test.category.name }}</span>
+                {% endif %}
+              </td>
+              <td class="mono" style="font-size:12px">{{ att.finished_at.strftime('%d.%m.%Y %H:%M') if att.finished_at }}</td>
+              <td class="mono fw-700" style="color:{% if att.passed %}var(--success){% else %}var(--danger){% endif %}">{{ att.score|int }}%</td>
+              <td>
+                {% if att.passed %}
+                <span class="badge badge-success"><i class="fas fa-check"></i> Сдан</span>
+                {% else %}
+                <span class="badge badge-danger"><i class="fas fa-times"></i> Не сдан</span>
+                {% endif %}
+              </td>
+              <td class="mono text-muted" style="font-size:12px">{{ att.duration_minutes }} мин</td>
+              <td>
+                <a href="{{ url_for('taking.result', attempt_id=att.id) }}" class="btn btn-ghost btn-sm">
+                  <i class="fas fa-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <i class="fas fa-clipboard-list"></i>
+        <p>Вы ещё не проходили тесты</p>
+        <a href="{{ url_for('tests.list_tests') }}" class="btn btn-primary mt-16">Перейти к тестам</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+@media(max-width:900px){.profile-grid{grid-template-columns:1fr!important}}
+</style>
+{% endblock %}

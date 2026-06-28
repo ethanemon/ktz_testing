@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Результат: {{ test.title }} — КТЗ{% endblock %}
+{% block page_title %}Результат тестирования{% endblock %}
+
+{% block content %}
+<!-- Hero результата -->
+<div class="result-hero {% if attempt.passed %}passed{% else %}failed{% endif %}">
+  <div class="result-hero-icon">{{ '🏆' if attempt.passed else '📋' }}</div>
+  <h2 style="color:{% if attempt.passed %}var(--success){% else %}var(--danger){% endif %}">
+    {{ 'Тест сдан!' if attempt.passed else 'Тест не сдан' }}
+  </h2>
+  <p>{{ test.title }}</p>
+  <p class="text-muted" style="font-size:12px;margin-top:4px">
+    Попытка #{{ attempt.attempt_number }} · {{ attempt.finished_at.strftime('%d.%m.%Y в %H:%M') if attempt.finished_at }}
+    {% if attempt.duration_minutes %} · {{ attempt.duration_minutes }} мин{% endif %}
+  </p>
+</div>
+
+<!-- Метрики -->
+<div class="stats-grid" style="margin-bottom:28px">
+  <div class="stat-card" style="flex-direction:column;align-items:center;text-align:center;padding:28px 20px">
+    <!-- Score ring -->
+    <div class="score-ring" style="margin-bottom:8px">
+      <svg viewBox="0 0 100 100" width="100" height="100">
+        <circle class="ring-bg" cx="50" cy="50" r="42"/>
+        <circle class="ring-fill" cx="50" cy="50" r="42"
+          stroke="{% if attempt.passed %}var(--success){% else %}var(--danger){% endif %}"
+          stroke-dasharray="{{ (attempt.score / 100 * 263.9)|round(1) }} 263.9"
+          id="scoreRing"/>
+      </svg>
+      <div class="score-ring-label">
+        <span class="score-number" style="color:{% if attempt.passed %}var(--success){% else %}var(--danger){% endif %}">
+          {{ attempt.score|int }}
+        </span>
+        <span class="score-pct">%</span>
+      </div>
+    </div>
+    <div class="stat-label">Итоговый балл</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">Проходной: {{ test.passing_score }}%</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon {% if attempt.passed %}green{% else %}red{% endif %}">
+      <i class="fas fa-{% if attempt.passed %}check{% else %}times{% endif %}"></i>
+    </div>
+    <div>
+      <div class="stat-value">{{ attempt.points_earned|round(1) }}</div>
+      <div class="stat-label">Баллов набрано</div>
+      <div style="font-size:11px;color:var(--muted)">из {{ test.total_points }}</div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="fas fa-check-circle"></i></div>
+    <div>
+      {% set correct_count = attempt.answers|selectattr('is_correct', 'eq', true)|list|length %}
+      <div class="stat-value">{{ correct_count }}</div>
+      <div class="stat-label">Правильных ответов</div>
+      <div style="font-size:11px;color:var(--muted)">из {{ test.question_count }}</div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon orange"><i class="fas fa-clock"></i></div>
+    <div>
+      <div class="stat-value mono">{{ attempt.duration_minutes or '—' }}</div>
+      <div class="stat-label">Минут потрачено</div>
+      {% if test.time_limit %}<div style="font-size:11px;color:var(--muted)">лимит {{ test.time_limit }} мин</div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Разбор ошибок -->
+{% if test.show_results %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title"><i class="fas fa-list-check"></i> Разбор ответов</span>
+    <span class="badge badge-info">{{ test.question_count }} вопросов</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% for item in questions_with_answers %}
+    {% set q = item.question %}
+    {% set ua = item.user_answer %}
+    {% set selected = item.selected_ids %}
+    <div style="padding:20px 24px;border-bottom:1px solid #f0f3f8">
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:14px">
+        <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;
+          background:{% if ua and ua.is_correct %}#ecfdf5{% else %}#fef2f2{% endif %};
+          color:{% if ua and ua.is_correct %}var(--success){% else %}var(--danger){% endif %}">
+          {{ loop.index }}
+        </div>
+        <div style="flex:1">
+          <div class="question-text" style="font-size:14px;margin-bottom:0">{{ q.text }}</div>
+          <div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge badge-neutral" style="font-size:10px">{{ q.type_display }}</span>
+            {% if q.ai_generated %}<span class="ai-badge"><i class="fas fa-robot"></i> ИИ</span>{% endif %}
+            {% if ua %}
+              {% if ua.is_correct %}
+                <span class="badge badge-success"><i class="fas fa-check"></i> Верно</span>
+              {% else %}
+                <span class="badge badge-danger"><i class="fas fa-times"></i> Неверно</span>
+              {% endif %}
+              <span class="text-muted mono" style="font-size:12px">{{ ua.points_earned }} / {{ q.points }} б.</span>
+            {% else %}
+              <span class="badge badge-warning">Нет ответа</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if q.question_type in ('single', 'multiple') %}
+        {% for opt in q.options|sort(attribute='order') %}
+          {% set is_selected = opt.id in selected %}
+          {% set is_correct = opt.is_correct %}
+          <div class="option-label {% if is_selected and is_correct %}correct{% elif is_selected and not is_correct %}wrong{% elif is_correct %}correct{% endif %}"
+               style="cursor:default;margin-bottom:6px;opacity:{% if not is_selected and not is_correct %}0.55{% else %}1{% endif %}">
+            <span style="width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;
+              background:{% if is_selected and is_correct %}var(--success){% elif is_selected and not is_correct %}var(--danger){% elif is_correct %}var(--success){% else %}#e8edf3{% endif %};
+              color:{% if is_selected or is_correct %}#fff{% else %}var(--muted){% endif %}">
+              {% if is_selected and is_correct %}<i class="fas fa-check"></i>
+              {% elif is_selected and not is_correct %}<i class="fas fa-times"></i>
+              {% elif is_correct %}<i class="fas fa-check"></i>
+              {% else %}·{% endif %}
+            </span>
+            <span>{{ opt.text }}</span>
+            {% if is_correct and not is_selected %}
+              <span style="margin-left:auto;font-size:11px;color:var(--success);white-space:nowrap">← правильный</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+
+      {% elif q.question_type == 'text' %}
+        <div style="margin-bottom:10px">
+          <div style="font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Ваш ответ:</div>
+          <div style="background:#f8fafd;border:1px solid #e8edf3;border-radius:8px;padding:12px;font-size:13.5px;min-height:44px">
+            {{ ua.text_answer if ua and ua.text_answer else '<span class="text-muted">Ответ не введён</span>' }}
+          </div>
+        </div>
+        {% if ua and ua.ai_score is not none %}
+        <div style="background:linear-gradient(135deg,#eff6ff,#e0e7ff);border:1px solid #c7d2fe;border-radius:8px;padding:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span class="ai-badge"><i class="fas fa-robot"></i> Оценка ИИ</span>
+            <span class="mono fw-700" style="color:{% if ua.ai_score >= 70 %}var(--success){% else %}var(--danger){% endif %}">
+              {{ ua.ai_score|int }}%
+            </span>
+          </div>
+          <p style="font-size:13px;color:#3730a3;margin:0">{{ ua.ai_feedback }}</p>
+        </div>
+        {% endif %}
+      {% endif %}
+
+      {% if q.explanation %}
+      <div style="margin-top:10px;padding:10px 14px;background:#fffbeb;border-left:3px solid var(--warning);border-radius:0 6px 6px 0;font-size:13px">
+        <i class="fas fa-lightbulb" style="color:var(--warning)"></i>
+        <strong style="font-size:11.5px;text-transform:uppercase;letter-spacing:.4px"> Пояснение:</strong>
+        {{ q.explanation }}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Кнопки -->
+<div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap">
+  <a href="{{ url_for('tests.list_tests') }}" class="btn btn-primary">
+    <i class="fas fa-clipboard-list"></i> К списку тестов
+  </a>
+  <a href="{{ url_for('auth.profile') }}" class="btn btn-secondary">
+    <i class="fas fa-user"></i> Мой профиль
+  </a>
+  {% if attempt.passed %}
+  <button onclick="printResult()" class="btn btn-secondary">
+    <i class="fas fa-print"></i> Распечатать результат
+  </button>
+  {% endif %}
+  {% if current_user.role in ('admin','hr') %}
+  <a href="{{ url_for('analytics.index') }}" class="btn btn-secondary">
+    <i class="fas fa-chart-bar"></i> Аналитика
+  </a>
+  {% endif %}
+</div>
+
+<script>
+function printResult() {
+  window.print();
+}
+// Анимация кольца
+document.addEventListener('DOMContentLoaded', () => {
+  const ring = document.getElementById('scoreRing');
+  if (ring) {
+    const score = {{ attempt.score }};
+    const circ = 263.9;
+    ring.style.strokeDasharray = `0 ${circ}`;
+    setTimeout(() => {
+      ring.style.transition = 'stroke-dasharray 1s ease';
+      ring.style.strokeDasharray = `${(score/100*circ).toFixed(1)} ${circ}`;
+    }, 200);
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}{{ test.title }} — Прохождение{% endblock %}
+{% block page_title %}{{ test.title }}{% endblock %}
+
+{% block content %}
+<!-- Верхняя панель теста -->
+<div class="card mb-16" style="position:sticky;top:60px;z-index:40;border:none;background:var(--navy);color:#fff">
+  <div style="padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:20px">
+      <div>
+        <div style="font-size:11px;color:var(--steel);text-transform:uppercase;letter-spacing:.8px">Тест</div>
+        <div style="font-weight:600;font-size:14px">{{ test.title }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--steel);text-transform:uppercase;letter-spacing:.8px">Вопросов</div>
+        <div class="mono fw-700">{{ questions|length }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--steel);text-transform:uppercase;letter-spacing:.8px">Попытка</div>
+        <div class="mono fw-700">#{{ attempt.attempt_number }}</div>
+      </div>
+    </div>
+
+    {% if time_limit_secs > 0 %}
+    <div>
+      <div style="font-size:11px;color:var(--steel);text-transform:uppercase;letter-spacing:.8px;text-align:center;margin-bottom:2px">Осталось</div>
+      <div class="timer-display" id="timer">
+        <i class="fas fa-clock"></i>
+        <span id="timerValue">--:--</span>
+      </div>
+    </div>
+    {% endif %}
+
+    <button onclick="submitTest()" class="btn btn-success" id="submitBtn">
+      <i class="fas fa-check-circle"></i> Завершить тест
+    </button>
+  </div>
+  <!-- Прогресс -->
+  <div class="progress-bar" style="border-radius:0;height:4px;background:rgba(255,255,255,.1)">
+    <div class="progress-fill" id="progressBar" style="width:0%;background:var(--blue);border-radius:0;transition:width .3s"></div>
+  </div>
+</div>
+
+<!-- Вопросы -->
+<form id="testForm" oncontextmenu="return false">
+  {% for q in questions %}
+  <div class="question-block" id="qblock_{{ q.id }}">
+    <div class="question-header">
+      <span class="question-num">Вопрос {{ loop.index }} из {{ questions|length }}</span>
+      <span class="question-type-badge">{{ q.type_display }}</span>
+      <span class="question-pts">{{ q.points }} б.</span>
+    </div>
+    <div class="question-body">
+      <div class="question-text">{{ q.text }}</div>
+
+      {% if q.question_type == 'single' %}
+        {% for opt in q._shuffled_options %}
+        <label class="option-label" id="opt_{{ opt.id }}">
+          <input type="radio" name="q_{{ q.id }}" value="{{ opt.id }}" onchange="updateProgress(); styleOption(this)">
+          <span>{{ opt.text }}</span>
+        </label>
+        {% endfor %}
+
+      {% elif q.question_type == 'multiple' %}
+        <p class="text-muted" style="font-size:12px;margin-bottom:10px"><i class="fas fa-info-circle"></i> Выберите все правильные варианты</p>
+        {% for opt in q._shuffled_options %}
+        <label class="option-label" id="opt_{{ opt.id }}">
+          <input type="checkbox" name="q_{{ q.id }}" value="{{ opt.id }}" onchange="updateProgress(); styleCheckbox(this)">
+          <span>{{ opt.text }}</span>
+        </label>
+        {% endfor %}
+
+      {% elif q.question_type == 'text' %}
+        <p class="text-muted" style="font-size:12px;margin-bottom:10px"><i class="fas fa-robot"></i> Ответ будет оценён с помощью ИИ</p>
+        <textarea name="q_text_{{ q.id }}" class="form-control" rows="4"
+                  placeholder="Введите развёрнутый ответ..."
+                  oninput="updateProgress()"
+                  oncopy="return false" onpaste="return false" oncut="return false"></textarea>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</form>
+
+<div style="text-align:center;padding:24px 0">
+  <button onclick="submitTest()" class="btn btn-success btn-lg">
+    <i class="fas fa-check-circle"></i> Завершить и получить результат
+  </button>
+</div>
+
+<script>
+const ATTEMPT_ID   = {{ attempt.id }};
+const TIME_LIMIT   = {{ time_limit_secs }};
+const ELAPSED      = {{ elapsed }};
+const QUESTION_IDS = [{% for q in questions %}{{ q.id }},{% endfor %}];
+let submitted = false;
+
+// ── Таймер ──────────────────────────────────────────────────────────
+if (TIME_LIMIT > 0) {
+  let remaining = Math.max(0, TIME_LIMIT - ELAPSED);
+  const timerEl = document.getElementById('timerValue');
+  const timerWrap = document.getElementById('timer');
+
+  function tick() {
+    if (submitted) return;
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    timerEl.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    if (remaining <= 60)  timerWrap.classList.add('warning');
+    if (remaining <= 10)  { timerWrap.classList.remove('warning'); timerWrap.classList.add('danger'); }
+    if (remaining <= 0)   { submitTest(true); return; }
+    remaining--;
+    setTimeout(tick, 1000);
+  }
+  tick();
+}
+
+// ── Прогресс ────────────────────────────────────────────────────────
+function updateProgress() {
+  let answered = 0;
+  for (const qid of QUESTION_IDS) {
+    const radios = document.querySelectorAll(`input[name="q_${qid}"]:checked`);
+    const checks = document.querySelectorAll(`input[name="q_${qid}"]:checked`);
+    const textarea = document.querySelector(`textarea[name="q_text_${qid}"]`);
+    if (radios.length > 0 || checks.length > 0 || (textarea && textarea.value.trim())) answered++;
+  }
+  const pct = Math.round(answered / QUESTION_IDS.length * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+// ── Стилизация вариантов ────────────────────────────────────────────
+function styleOption(input) {
+  const name = input.name;
+  document.querySelectorAll(`input[name="${name}"]`).forEach(i => {
+    i.closest('.option-label').classList.remove('selected');
+  });
+  if (input.checked) input.closest('.option-label').classList.add('selected');
+}
+function styleCheckbox(input) {
+  input.closest('.option-label').classList.toggle('selected', input.checked);
+}
+
+// ── Отправка ─────────────────────────────────────────────────────────
+async function submitTest(timeUp = false) {
+  if (submitted) return;
+  if (!timeUp && !confirm('Завершить тест? Вы ответили на ' + getAnsweredCount() + ' из ' + QUESTION_IDS.length + ' вопросов.')) return;
+
+  submitted = true;
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Отправляю…';
+
+  const answers = {};
+  for (const qid of QUESTION_IDS) {
+    // single
+    const radio = document.querySelector(`input[name="q_${qid}"]:checked`);
+    if (radio) { answers[qid] = [parseInt(radio.value)]; continue; }
+    // multiple
+    const checked = [...document.querySelectorAll(`input[name="q_${qid}"]:checked`)];
+    if (checked.length > 0) { answers[qid] = checked.map(i => parseInt(i.value)); continue; }
+    // text
+    const ta = document.querySelector(`textarea[name="q_text_${qid}"]`);
+    if (ta) { answers[qid] = ta.value.trim(); continue; }
+  }
+
+  try {
+    const r = await fetch(`/take/${ATTEMPT_ID}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers })
+    });
+    const data = await r.json();
+    if (data.redirect) window.location.href = data.redirect;
+  } catch(e) {
+    alert('Ошибка отправки. Попробуйте ещё раз.');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check-circle"></i> Завершить тест';
+    submitted = false;
+  }
+}
+
+function getAnsweredCount() {
+  let n = 0;
+  for (const qid of QUESTION_IDS) {
+    const inputs = document.querySelectorAll(`input[name="q_${qid}"]:checked`);
+    const ta = document.querySelector(`textarea[name="q_text_${qid}"]`);
+    if (inputs.length > 0 || (ta && ta.value.trim())) n++;
+  }
+  return n;
+}
+
+// Предупреждение при уходе
+window.addEventListener('beforeunload', e => {
+  if (!submitted) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+{% endblock %}

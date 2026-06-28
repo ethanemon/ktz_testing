@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Вопросы: {{ test.title }} — КТЗ{% endblock %}
+{% block page_title %}Редактор вопросов{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 style="font-size:18px">{{ test.title }}</h1>
+    <p class="text-muted">{{ test.question_count }} вопросов · {{ test.total_points }} баллов · <span class="mono">{{ test.time_limit }} мин</span></p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="{{ url_for('tests.edit_test', test_id=test.id) }}" class="btn btn-secondary btn-sm"><i class="fas fa-cog"></i> Настройки</a>
+    <a href="{{ url_for('tests.list_tests') }}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> К списку</a>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start">
+
+  <!-- Список вопросов -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Вопросы теста</span>
+      <span class="badge badge-info">{{ test.question_count }} шт.</span>
+    </div>
+    <div class="card-body" style="padding:16px">
+      {% if test.questions %}
+      <div class="q-editor-list" id="qList">
+        {% for q in test.questions %}
+        <div class="q-item" data-id="{{ q.id }}">
+          <span class="q-item-num">#{{ loop.index }}</span>
+          <div style="flex:1;min-width:0">
+            <div class="q-item-text">{{ q.text[:120] }}{% if q.text|length > 120 %}…{% endif %}</div>
+            <div class="q-item-meta">
+              <span class="badge badge-neutral" style="font-size:10px">{{ q.type_display }}</span>
+              <span class="mono" style="font-size:10.5px;margin-left:6px">{{ q.points }} б.</span>
+              &nbsp;·&nbsp; {{ q.options|length }} вариантов
+            </div>
+          </div>
+          <button onclick="deleteQuestion({{ q.id }}, this)" class="btn btn-ghost btn-sm btn-icon" title="Удалить">
+            <i class="fas fa-trash text-danger"></i>
+          </button>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state" style="padding:40px">
+        <i class="fas fa-question-circle"></i>
+        <p>Вопросы ещё не добавлены</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Панель добавления -->
+  <div style="position:sticky;top:80px">
+    <div class="card">
+      <div class="card-header"><span class="card-title"><i class="fas fa-pen"></i> Добавить вопрос</span></div>
+      <div class="card-body" style="padding:16px">
+        <div class="form-group">
+          <label class="form-label">Текст вопроса *</label>
+          <textarea id="qText" class="form-control" rows="3" placeholder="Введите вопрос..."></textarea>
+        </div>
+        <div class="form-row cols-2">
+          <div class="form-group mb-0">
+            <label class="form-label">Тип</label>
+            <select id="qType" class="form-control" onchange="toggleOptions()">
+              <option value="single">Один ответ</option>
+              <option value="multiple">Несколько ответов</option>
+              <option value="text">Открытый ответ</option>
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <label class="form-label">Баллы</label>
+            <input type="number" id="qPoints" class="form-control" value="1" min="1" max="10">
+          </div>
+        </div>
+
+        <div id="optionsSection" style="margin-top:14px">
+          <label class="form-label">Варианты ответов</label>
+          <div id="optionsList"></div>
+          <button type="button" onclick="addOption()" class="btn btn-secondary btn-sm mt-16">
+            <i class="fas fa-plus"></i> Добавить вариант
+          </button>
+        </div>
+
+        <div id="textAnswerSection" style="display:none;margin-top:14px">
+          <label class="form-label">Эталонный ответ</label>
+          <textarea id="refAnswer" class="form-control" rows="3" placeholder="Правильный ответ для проверки"></textarea>
+        </div>
+
+        <div class="form-group" style="margin-top:14px">
+          <label class="form-label">Пояснение (показывается после теста)</label>
+          <textarea id="qExplanation" class="form-control" rows="2" placeholder="Необязательно"></textarea>
+        </div>
+
+        <button onclick="saveQuestion()" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px">
+          <i class="fas fa-save"></i> Сохранить вопрос
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TEST_ID = {{ test.id }};
+
+function addOption(text='', correct=false) {
+  const list = document.getElementById('optionsList');
+  const qtype = document.getElementById('qType').value;
+  const inputType = qtype === 'multiple' ? 'checkbox' : 'radio';
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px';
+  div.innerHTML = `
+    <input type="${inputType}" name="correctOpt" ${correct ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--blue);flex-shrink:0">
+    <input type="text" class="form-control" placeholder="Вариант ответа" value="${text}" style="flex:1">
+    <button type="button" onclick="this.parentElement.remove()" class="btn btn-ghost btn-sm btn-icon"><i class="fas fa-times text-danger"></i></button>
+  `;
+  list.appendChild(div);
+}
+
+function toggleOptions() {
+  const type = document.getElementById('qType').value;
+  const opts = document.getElementById('optionsSection');
+  const textSec = document.getElementById('textAnswerSection');
+  const list = document.getElementById('optionsList');
+  if (type === 'text') {
+    opts.style.display = 'none';
+    textSec.style.display = 'block';
+  } else {
+    opts.style.display = 'block';
+    textSec.style.display = 'none';
+    list.querySelectorAll('input[type=radio],input[type=checkbox]').forEach(inp => {
+      inp.type = type === 'multiple' ? 'checkbox' : 'radio';
+    });
+  }
+}
+
+addOption(); addOption(); addOption(); addOption();
+
+async function saveQuestion() {
+  const text = document.getElementById('qText').value.trim();
+  const type = document.getElementById('qType').value;
+  const points = parseInt(document.getElementById('qPoints').value) || 1;
+  const explanation = document.getElementById('qExplanation').value.trim();
+
+  if (!text) { alert('Введите текст вопроса'); return; }
+
+  let options = [];
+  if (type === 'text') {
+    const ref = document.getElementById('refAnswer').value.trim();
+    if (!ref) { alert('Введите эталонный ответ'); return; }
+    options = [{ text: ref, is_correct: true }];
+  } else {
+    const rows = document.getElementById('optionsList').children;
+    for (const row of rows) {
+      const optText = row.querySelector('input[type=text]')?.value.trim();
+      const isCorrect = row.querySelector('input[type=radio],input[type=checkbox]')?.checked || false;
+      if (optText) options.push({ text: optText, is_correct: isCorrect });
+    }
+    if (options.length < 2) { alert('Добавьте минимум 2 варианта ответа'); return; }
+    if (!options.some(o => o.is_correct)) { alert('Отметьте хотя бы один правильный ответ'); return; }
+  }
+
+  const r = await fetch(`/tests/${TEST_ID}/questions/add`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, question_type: type, points, options, explanation, ai_generated: false })
+  });
+  if (r.ok) {
+    location.reload();
+  } else {
+    alert('Ошибка сохранения');
+  }
+}
+
+async function deleteQuestion(qId, btn) {
+  if (!confirm('Удалить этот вопрос?')) return;
+  const r = await fetch(`/tests/questions/${qId}/delete`, { method: 'POST' });
+  if (r.ok) {
+    btn.closest('.q-item').remove();
+    document.querySelectorAll('.q-item .q-item-num').forEach((el, i) => el.textContent = `#${i+1}`);
+  }
+}
+</script>
+{% endblock %}

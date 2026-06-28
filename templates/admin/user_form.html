@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{% if user %}Редактировать{% else %}Новый{% endif %} сотрудник — КТЗ{% endblock %}
+{% block page_title %}{% if user %}Редактировать сотрудника{% else %}Новый сотрудник{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width:640px">
+  <div class="page-header">
+    <div>
+      <h1>{% if user %}{{ user.full_name }}{% else %}Новый сотрудник{% endif %}</h1>
+      <p class="text-muted">{% if user %}Изменение данных аккаунта{% else %}Создание нового аккаунта в системе{% endif %}</p>
+    </div>
+    <a href="{{ url_for('admin.users') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Назад</a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label class="form-label">Логин *</label>
+            <input type="text" name="username" class="form-control" required
+                   value="{{ user.username if user else '' }}"
+                   {% if user %}readonly style="background:#f5f7fa;color:var(--muted)"{% endif %}
+                   placeholder="ivanov.av">
+            {% if user %}<div class="form-hint">Логин изменить нельзя</div>{% endif %}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email *</label>
+            <input type="email" name="email" class="form-control" required
+                   value="{{ user.email if user else '' }}"
+                   placeholder="ivanov@ktz.ru">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">ФИО *</label>
+          <input type="text" name="full_name" class="form-control" required
+                 value="{{ user.full_name if user else '' }}"
+                 placeholder="Иванов Алексей Николаевич">
+        </div>
+
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label class="form-label">Подразделение</label>
+            <input type="text" name="department" class="form-control"
+                   value="{{ user.department if user else '' }}"
+                   placeholder="Цех №1 (профильные трубы)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Должность</label>
+            <input type="text" name="position" class="form-control"
+                   value="{{ user.position if user else '' }}"
+                   placeholder="Сварщик 5 разряда">
+          </div>
+        </div>
+
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label class="form-label">Роль</label>
+            <select name="role" class="form-control">
+              <option value="employee" {% if user and user.role == 'employee' %}selected{% endif %}>Сотрудник</option>
+              <option value="manager"  {% if user and user.role == 'manager'  %}selected{% endif %}>Руководитель подразделения</option>
+              <option value="hr"       {% if user and user.role == 'hr'       %}selected{% endif %}>HR-специалист</option>
+              <option value="admin"    {% if user and user.role == 'admin'    %}selected{% endif %}>Администратор</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">{% if user %}Новый пароль (оставьте пустым, чтобы не менять){% else %}Пароль *{% endif %}</label>
+          <input type="password" name="password" class="form-control"
+                 {% if not user %}required{% endif %} minlength="6"
+                 placeholder="Минимум 6 символов">
+        </div>
+
+        {% if user %}
+        <div class="form-check" style="margin-bottom:20px">
+          <input type="checkbox" name="is_active" id="is_active" {% if user.is_active %}checked{% endif %}>
+          <label for="is_active">Аккаунт активен</label>
+        </div>
+        {% endif %}
+
+        <div style="display:flex;gap:10px">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save"></i> {% if user %}Сохранить{% else %}Создать{% endif %}
+          </button>
+          <a href="{{ url_for('admin.users') }}" class="btn btn-secondary">Отмена</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Аналитика — КТЗ{% endblock %}
+{% block page_title %}Аналитика и отчёты{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Аналитика</h1>
+    <p class="text-muted">Сводная статистика по тестированию сотрудников</p>
+  </div>
+  <a href="{{ url_for('analytics.export_excel') }}" class="btn btn-success">
+    <i class="fas fa-file-excel"></i> Экспорт Excel
+  </a>
+</div>
+
+<!-- KPI -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+    <div>
+      <div class="stat-value">{{ total_users }}</div>
+      <div class="stat-label">Активных сотрудников</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><i class="fas fa-clipboard-check"></i></div>
+    <div>
+      <div class="stat-value">{{ total_tests }}</div>
+      <div class="stat-label">Активных тестов</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange"><i class="fas fa-chart-bar"></i></div>
+    <div>
+      <div class="stat-value">{{ total_attempts }}</div>
+      <div class="stat-label">Всего прохождений</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon {% if global_pass_rate >= 70 %}green{% elif global_pass_rate >= 50 %}orange{% else %}red{% endif %}">
+      <i class="fas fa-trophy"></i>
+    </div>
+    <div>
+      <div class="stat-value mono">{{ global_pass_rate }}%</div>
+      <div class="stat-label">Общая сдаваемость</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon purple"><i class="fas fa-calendar-week"></i></div>
+    <div>
+      <div class="stat-value">{{ recent_attempts }}</div>
+      <div class="stat-label">За последние 30 дней</div>
+    </div>
+  </div>
+</div>
+
+<!-- Проблемные тесты -->
+{% if problem_tests %}
+<div class="card mb-24">
+  <div class="card-header">
+    <span class="card-title"><i class="fas fa-exclamation-triangle text-warning"></i> Проблемные темы</span>
+    <span class="text-muted" style="font-size:12px">Низкий процент сдачи (&lt;3 попыток не учитываются)</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Тест</th>
+          <th>Категория</th>
+          <th>Сдаваемость</th>
+          <th>Прохождений</th>
+          <th>Средний балл</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for test, rate, count in problem_tests %}
+        <tr>
+          <td><a href="{{ url_for('tests.edit_questions', test_id=test.id) }}" style="color:var(--blue);text-decoration:none;font-weight:500">{{ test.title }}</a></td>
+          <td>
+            {% if test.category %}
+            <span class="badge" style="background:{{ test.category.color }}20;color:{{ test.category.color }}">{{ test.category.name }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="progress-bar" style="width:80px">
+                <div class="progress-fill" style="width:{{ rate }}%;background:{% if rate >= 70 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %}"></div>
+              </div>
+              <span class="mono fw-600" style="color:{% if rate >= 70 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %}">{{ rate }}%</span>
+            </div>
+          </td>
+          <td class="mono">{{ count }}</td>
+          <td class="mono">{% if test.avg_score is not none %}{{ test.avg_score }}%{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Графики -->
+<div class="charts-grid">
+  <div class="chart-card">
+    <h3><i class="fas fa-chart-line" style="color:var(--blue)"></i> Активность за 30 дней</h3>
+    <canvas id="dailyChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3><i class="fas fa-chart-pie" style="color:var(--warning)"></i> Распределение баллов</h3>
+    <canvas id="scoreChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3><i class="fas fa-chart-bar" style="color:var(--success)"></i> Средний балл по категориям</h3>
+    <canvas id="catChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3><i class="fas fa-building" style="color:#6366f1"></i> Результаты по подразделениям</h3>
+    <canvas id="deptChart"></canvas>
+  </div>
+</div>
+
+<!-- Последние попытки -->
+<div class="card" style="margin-top:24px">
+  <div class="card-header">
+    <span class="card-title">Последние прохождения</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Сотрудник</th><th>Подразделение</th><th>Тест</th><th>Дата</th><th>Балл</th><th>Результат</th><th>Время</th></tr>
+      </thead>
+      <tbody>
+        {% for att in recent %}
+        <tr>
+          <td><span class="fw-600">{{ att.user.full_name if att.user else '—' }}</span></td>
+          <td class="text-muted" style="font-size:12px">{{ att.user.department if att.user else '—' }}</td>
+          <td>{{ att.test.title if att.test else '—' }}</td>
+          <td class="mono" style="font-size:12px">{{ att.finished_at.strftime('%d.%m.%Y %H:%M') if att.finished_at }}</td>
+          <td class="mono fw-700" style="color:{% if att.passed %}var(--success){% else %}var(--danger){% endif %}">{{ att.score|int }}%</td>
+          <td>
+            {% if att.passed %}
+            <span class="badge badge-success"><i class="fas fa-check"></i> Сдан</span>
+            {% else %}
+            <span class="badge badge-danger"><i class="fas fa-times"></i> Не сдан</span>
+            {% endif %}
+          </td>
+          <td class="mono text-muted" style="font-size:12px">{{ att.duration_minutes }} мин</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+Chart.defaults.font.family = 'Geologica, sans-serif';
+Chart.defaults.color = '#6b7c93';
+
+async function loadCharts() {
+  const r = await fetch('/analytics/api/chart-data');
+  const d = await r.json();
+
+  // Активность
+  new Chart(document.getElementById('dailyChart'), {
+    type: 'line',
+    data: {
+      labels: d.daily.map(x => x.date),
+      datasets: [{
+        label: 'Прохождений',
+        data: d.daily.map(x => x.count),
+        borderColor: '#1a6fc4', backgroundColor: 'rgba(26,111,196,.1)',
+        fill: true, tension: .4, pointRadius: 3,
+      }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+
+  // Распределение баллов
+  new Chart(document.getElementById('scoreChart'), {
+    type: 'doughnut',
+    data: {
+      labels: d.score_distribution.map(x => x.range + '%'),
+      datasets: [{
+        data: d.score_distribution.map(x => x.count),
+        backgroundColor: ['#ef4444','#f59e0b','#3b82f6','#10b981','#6366f1'],
+        borderWidth: 2, borderColor: '#fff',
+      }]
+    },
+    options: { plugins: { legend: { position: 'bottom' } } }
+  });
+
+  // По категориям
+  if (d.categories.length > 0) {
+    new Chart(document.getElementById('catChart'), {
+      type: 'bar',
+      data: {
+        labels: d.categories.map(x => x.name),
+        datasets: [{
+          label: 'Средний балл (%)',
+          data: d.categories.map(x => x.avg_score),
+          backgroundColor: 'rgba(16,185,129,.7)',
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, max: 100 } },
+        indexAxis: d.categories.length > 4 ? 'y' : 'x',
+      }
+    });
+  } else {
+    document.getElementById('catChart').parentElement.innerHTML += '<p class="text-muted" style="text-align:center;font-size:13px;padding:30px">Нет данных</p>';
+  }
+
+  // По отделам
+  if (d.departments.length > 0) {
+    new Chart(document.getElementById('deptChart'), {
+      type: 'bar',
+      data: {
+        labels: d.departments.map(x => x.dept),
+        datasets: [
+          { label: 'Средний балл', data: d.departments.map(x => x.avg_score), backgroundColor: 'rgba(99,102,241,.7)', borderRadius: 4 },
+          { label: 'Сдаваемость %', data: d.departments.map(x => x.pass_rate), backgroundColor: 'rgba(245,158,11,.7)', borderRadius: 4 },
+        ]
+      },
+      options: {
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true, max: 100 } },
+        indexAxis: 'y',
+      }
+    });
+  } else {
+    document.getElementById('deptChart').parentElement.innerHTML += '<p class="text-muted" style="text-align:center;font-size:13px;padding:30px">Заполните отделы у сотрудников</p>';
+  }
+}
+
+loadCharts();
+</script>
+{% endblock %}

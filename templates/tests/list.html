@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Тесты — КТЗ{% endblock %}
+{% block page_title %}Банк тестов{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Банк тестов</h1>
+    <p class="text-muted">Управление тестами и вопросами</p>
+  </div>
+  {% if current_user.role in ('admin','hr') %}
+  <a href="{{ url_for('tests.create_test') }}" class="btn btn-primary">
+    <i class="fas fa-plus"></i> Создать тест
+  </a>
+  {% endif %}
+</div>
+
+<!-- Фильтр по категории -->
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+  <a href="{{ url_for('tests.list_tests') }}" class="btn btn-sm {% if not cat_filter %}btn-primary{% else %}btn-secondary{% endif %}">Все</a>
+  {% for cat in categories %}
+  <a href="{{ url_for('tests.list_tests', category=cat.id) }}" class="btn btn-sm {% if cat_filter == cat.id %}btn-primary{% else %}btn-secondary{% endif %}"
+     style="{% if cat_filter == cat.id %}background:{{ cat.color }};border-color:{{ cat.color }}{% endif %}">
+    <i class="fas fa-{{ cat.icon }}"></i> {{ cat.name }}
+  </a>
+  {% endfor %}
+</div>
+
+{% if tests %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Название теста</th>
+          <th>Категория</th>
+          <th>Вопросов</th>
+          <th>Время</th>
+          <th>Проходной балл</th>
+          <th>Сдаваемость</th>
+          <th>Статус</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for test in tests %}
+        <tr>
+          <td>
+            <div class="fw-600" style="font-size:13.5px">{{ test.title }}</div>
+            {% if test.description %}
+            <div class="text-muted" style="font-size:12px">{{ test.description[:60] }}{% if test.description|length > 60 %}…{% endif %}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if test.category %}
+            <span class="badge" style="background:{{ test.category.color }}20;color:{{ test.category.color }}">
+              <i class="fas fa-{{ test.category.icon }}"></i> {{ test.category.name }}
+            </span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="mono fw-600">{{ test.question_count }}</td>
+          <td>{% if test.time_limit %}<span class="mono">{{ test.time_limit }} мин</span>{% else %}—{% endif %}</td>
+          <td class="mono">{{ test.passing_score }}%</td>
+          <td>
+            {% if test.pass_rate is not none %}
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="progress-bar" style="width:60px">
+                <div class="progress-fill" style="width:{{ test.pass_rate }}%;background:{% if test.pass_rate >= 70 %}var(--success){% elif test.pass_rate >= 50 %}var(--warning){% else %}var(--danger){% endif %}"></div>
+              </div>
+              <span class="mono" style="font-size:12px">{{ test.pass_rate }}%</span>
+            </div>
+            {% else %}
+            <span class="text-muted" style="font-size:12px">нет данных</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if test.is_active %}
+            <span class="badge badge-success"><i class="fas fa-circle" style="font-size:7px"></i> Активен</span>
+            {% else %}
+            <span class="badge badge-neutral">Черновик</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:4px;align-items:center">
+              {% if test._attempts_left > 0 or current_user.role in ('admin','hr') %}
+              <a href="{{ url_for('taking.start', test_id=test.id) }}" class="btn btn-sm btn-primary btn-icon" title="Пройти">
+                <i class="fas fa-play"></i>
+              </a>
+              {% endif %}
+              {% if current_user.role in ('admin','hr') %}
+              <a href="{{ url_for('tests.edit_questions', test_id=test.id) }}" class="btn btn-sm btn-secondary btn-icon" title="Вопросы">
+                <i class="fas fa-list"></i>
+              </a>
+              <a href="{{ url_for('tests.edit_test', test_id=test.id) }}" class="btn btn-sm btn-secondary btn-icon" title="Настройки">
+                <i class="fas fa-edit"></i>
+              </a>
+              <form method="POST" action="{{ url_for('tests.delete_test', test_id=test.id) }}" style="display:inline">
+                <button type="submit" class="btn btn-sm btn-danger btn-icon"
+                        data-confirm="Удалить тест «{{ test.title }}»? Это действие необратимо." title="Удалить">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <i class="fas fa-clipboard-list"></i>
+  <p>Тесты не найдены</p>
+  {% if current_user.role in ('admin','hr') %}
+  <a href="{{ url_for('tests.create_test') }}" class="btn btn-primary mt-16"><i class="fas fa-plus"></i> Создать тест</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

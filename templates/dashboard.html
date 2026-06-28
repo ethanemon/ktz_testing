@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Главная — КТЗ{% endblock %}
+{% block page_title %}Добро пожаловать, {{ current_user.full_name.split()[0] if current_user.full_name else current_user.username }}{% endblock %}
+
+{% block content %}
+
+{% if current_user.role in ('admin', 'hr') %}
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+    <div>
+      <div class="stat-value">{{ stats.total_users }}</div>
+      <div class="stat-label">Активных сотрудников</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><i class="fas fa-clipboard-list"></i></div>
+    <div>
+      <div class="stat-value">{{ stats.total_tests }}</div>
+      <div class="stat-label">Тестов в системе</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange"><i class="fas fa-chart-bar"></i></div>
+    <div>
+      <div class="stat-value">{{ stats.total_attempts }}</div>
+      <div class="stat-label">Пройдено тестов</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon purple"><i class="fas fa-calendar-week"></i></div>
+    <div>
+      <div class="stat-value">{{ stats.recent_attempts }}</div>
+      <div class="stat-label">За последние 7 дней</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start" class="dashboard-grid">
+  <!-- Доступные тесты -->
+  <div>
+    <div class="page-header" style="margin-bottom:16px">
+      <div>
+        <h2 style="font-size:17px;font-weight:700">Доступные тесты</h2>
+        <p class="text-muted" style="font-size:13px">Выберите тест для прохождения</p>
+      </div>
+      {% if current_user.role in ('admin','hr') %}
+      <a href="{{ url_for('tests.create_test') }}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus"></i> Создать тест
+      </a>
+      {% endif %}
+    </div>
+
+    {% if available_tests %}
+    <div class="tests-grid">
+      {% for test in available_tests %}
+      <div class="test-card">
+        {% if test.category %}
+        <div class="test-card-cat" style="background:{{ test.category.color }}20;color:{{ test.category.color }}">
+          <i class="fas fa-{{ test.category.icon }}"></i>
+          {{ test.category.name }}
+        </div>
+        {% endif %}
+
+        <div class="test-card-title">{{ test.title }}</div>
+        {% if test.description %}
+        <div class="test-card-desc">{{ test.description[:100] }}{% if test.description|length > 100 %}…{% endif %}</div>
+        {% endif %}
+
+        <div class="test-card-meta">
+          <span class="test-meta-item"><i class="fas fa-question-circle"></i> {{ test.question_count }} вопросов</span>
+          <span class="test-meta-item"><i class="fas fa-clock"></i>
+            {% if test.time_limit %}{{ test.time_limit }} мин{% else %}Без лимита{% endif %}
+          </span>
+          <span class="test-meta-item"><i class="fas fa-trophy"></i> {{ test.passing_score }}% для сдачи</span>
+        </div>
+
+        {% if test._last_score is not none %}
+        <div style="margin-top:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span class="text-muted" style="font-size:12px">Последний результат</span>
+            <span class="mono fw-600" style="font-size:13px;color:{% if test._last_passed %}var(--success){% else %}var(--danger){% endif %}">
+              {{ test._last_score }}%
+            </span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:{{ test._last_score }}%;background:{% if test._last_passed %}var(--success){% else %}var(--danger){% endif %}"></div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="test-card-footer">
+          {% if test._attempts_left > 0 %}
+            <a href="{{ url_for('taking.start', test_id=test.id) }}" class="btn btn-primary btn-sm">
+              <i class="fas fa-play"></i> Начать
+            </a>
+            <span class="text-muted" style="font-size:12px">Попыток: {{ test._attempts_left }}</span>
+          {% else %}
+            <span class="badge badge-neutral">Попытки исчерпаны</span>
+          {% endif %}
+
+          {% if current_user.role in ('admin', 'hr') %}
+          <a href="{{ url_for('tests.edit_test', test_id=test.id) }}" class="btn btn-ghost btn-sm btn-icon">
+            <i class="fas fa-edit"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <i class="fas fa-clipboard-list"></i>
+      <p>Тесты пока не добавлены</p>
+      {% if current_user.role in ('admin','hr') %}
+      <a href="{{ url_for('tests.create_test') }}" class="btn btn-primary mt-16">
+        <i class="fas fa-plus"></i> Создать первый тест
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Боковая панель -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Мой профиль</span></div>
+      <div class="card-body" style="padding:16px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <div class="user-avatar" style="width:48px;height:48px;font-size:18px">{{ current_user.full_name[0] if current_user.full_name else 'U' }}</div>
+          <div>
+            <div class="fw-600">{{ current_user.full_name }}</div>
+            <div class="text-muted" style="font-size:12px">{{ current_user.position or '—' }}</div>
+          </div>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);line-height:2">
+          <div><i class="fas fa-building" style="width:16px"></i> {{ current_user.department or '—' }}</div>
+          <div><i class="fas fa-envelope" style="width:16px"></i> {{ current_user.email }}</div>
+          <div><i class="fas fa-shield-alt" style="width:16px"></i> <span class="user-role {{ current_user.role_badge_class }}">{{ current_user.role_display }}</span></div>
+        </div>
+        <a href="{{ url_for('auth.profile') }}" class="btn btn-secondary btn-sm" style="width:100%;justify-content:center;margin-top:14px">
+          Мои результаты
+        </a>
+      </div>
+    </div>
+
+    {% if my_attempts %}
+    <div class="card">
+      <div class="card-header"><span class="card-title">Последние результаты</span></div>
+      <div class="card-body" style="padding:0">
+        {% for att in my_attempts %}
+        <a href="{{ url_for('taking.result', attempt_id=att.id) }}" style="text-decoration:none;color:inherit">
+          <div style="padding:12px 16px;border-bottom:1px solid #f0f3f8;display:flex;align-items:center;gap:12px;transition:background .15s" onmouseover="this.style.background='#f8fafd'" onmouseout="this.style.background=''">
+            <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:{% if att.passed %}#ecfdf5{% else %}#fef2f2{% endif %}">
+              <i class="fas fa-{% if att.passed %}check{% else %}times{% endif %}" style="color:{% if att.passed %}var(--success){% else %}var(--danger){% endif %};font-size:14px"></i>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ att.test.title }}</div>
+              <div class="text-muted" style="font-size:11px">{{ att.finished_at.strftime('%d.%m.%Y') }}</div>
+            </div>
+            <div class="mono fw-700" style="font-size:15px;color:{% if att.passed %}var(--success){% else %}var(--danger){% endif %}">{{ att.score|int }}%</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+@media(max-width:900px){.dashboard-grid{grid-template-columns:1fr!important}}
+</style>
+{% endblock %}
