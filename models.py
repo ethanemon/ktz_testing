@@ -19,7 +19,7 @@ class User(UserMixin, db.Model):
     position = db.Column(db.String(150))
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    last_login = db.Column(db.f)
+    last_login = db.Column(db.DateTime)
 
     attempts = db.relationship('TestAttempt', backref='user', lazy=True)
     audit_logs = db.relationship('AuditLog', backref='user', lazy=True)
